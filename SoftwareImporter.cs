@@ -12,10 +12,16 @@ using Altiris.NS.ContextManagement;
 
 namespace Symantec.CWoC {
 	class SoftwareImporter {
-		public static readonly string ratguid_prodtocomp = "9D67B0C6-BEFF-4FCD-86C1-4A40028FE483";
+		public static readonly string prodtocomp_ratguid = "9D67B0C6-BEFF-4FCD-86C1-4A40028FE483";
 		public static readonly string prodtocomp = "Software Product Contains Software Component";
 
-		public static int Main() {
+		public static int Main(string [] Args) {
+			// Read data from file provided at command line
+			string import_file = "product.txt";
+			if (Args.Length == 1) {
+				import_file = Args[0];
+			}
+
 			string company_name = "Symantec CWoC";
 			string product_name = "Software Importer";
 			string product_description = "A software management program to create products from file";
@@ -31,94 +37,33 @@ namespace Symantec.CWoC {
 			Console.WriteLine("Product guid = {0}", productDetails.Guid.ToString());
 
 			// Mark as managed in all cases (existing entry or not)
-			string _sql_manage_product = @"
-if exists (select 1 from Inv_Software_Product_State where _ResourceGuid = '{0}')
-	update Inv_Software_Product_State set IsManaged = 1 where _resourceguid = '{0}'
-else
-	insert Inv_Software_Product_State (_ResourceGuid, IsManaged) values ('{0}', 1)
-";
-			string sql_manage_product = String.Format(_sql_manage_product, productDetails.Guid);
+			string sql_manage_product = String.Format(sql.set_product_managed, productDetails.Guid);
 			DatabaseAPI.ExecuteNonQuery(sql_manage_product);
 
 			// Associate Software Component if needed
-			string _sql_associate_component = @"
-			";
-			string sql_associate_component = String.Format(_sql_associate_component, productDetails.Guid,);
+			string sql_associate_component = String.Format(sql.associate_component, productDetails.Guid);
 
 			// Add the inventory dataclass entries
 			string SoftwareNameQueryString = "";
 			string CompanyQueryString = "";
 			string VersionQueryString = "";
 
-			string _sql_inventory_query = @"
-SELECT	   component.Guid
-		  ,component.Name
-		  ,component.ResourceTypeGuid
-		  ,scVersion.Version
-		  ,company.Name As CompanyName 
-		  ,company.Guid AS CompanyGuid
-		  ,inst.Installs
-		  ,swState.IsManaged
-  FROM vRM_Software_Component_Item component
-  JOIN (
-		Select COUNT(DISTINCT _ResourceGuid) as Installs, _SoftwareComponentGuid
-		  FROM Inv_InstalledSoftware
-		 Where InstallFlag = 1
-		 Group By _SoftwareComponentGuid
-		) as inst 
-    ON inst._SoftwareComponentGuid = component.Guid
-  JOIN Inv_Software_Component_State swState
-    ON swState._ResourceGuid = component.Guid
-  LEFT JOIN (
-		SELECT vci.Guid, vci.Name, ra.ParentResourceGuid AS ComponentGuid
-		  FROM vRM_Company_Item vci
-		  JOIN ResourceAssociation ra
-		    ON ra.ChildResourceGuid = vci.Guid 
-		   AND ra.ResourceAssociationTypeGuid = '292dbd81-1526-423a-ae6d-f44eb46c5b16'
-		) company
-    ON company.ComponentGuid = component.Guid
-  LEFT JOIN Inv_Software_Component scVersion
-    ON scVersion._ResourceGuid = component.Guid
- Where 1 = 1
-   AND Lower(component.Name) Like Lower('{0}')
-   AND Lower(ISNULL(company.Name, '')) Like Lower('{1}') 
-   AND Lower(ISNULL(scVersion.Version, '')) Like Lower('{2}') 
- Order By component.Name Asc
- ";
-
-			string sql_inventory_query = String.Format(_sql_inventory_query, SoftwareNameQueryString, CompanyQueryString, VersionQueryString);
+			string sql_inventory_query = String.Format(sql.inventory_query, SoftwareNameQueryString, CompanyQueryString, VersionQueryString);
 
 			// Create the data row for table Inv_SoftwareProductFilter
 
-			string _sql_software_product_filter = @"
-if exists (select 1 from Inv_SoftwareProductFilter where _ResourceGuid = '{0}')
-	update Inv_SoftwareProductFilter set NameFilter = '{1}', CompanyFilter = '{2}', VersionFilter = '{3}', SQLQueryFilter= '{4}' where _ResourceGuid = '{0}'
-else
-	insert Inv_SoftwareProductFilter (_ResourceGuid, NameFilter, CompanyFilter, VersionFilter, SQLQueryFilter)	values ('{0}', '{1}', '{2}', '{3}', '{4}')
-";
+			
 			// Ensure we have a clear entry in the ResourceUpdateSummary table too
-/* 
-			// Software Release details
-			SoftwareRelease sr = new SoftwareRelease();
-			sr.name = "Orca 3.0d";
-			sr.description = "Software release resource for Orca 3.0";
-			
-			// Software Package details
-			SoftwarePackage pkg = new SoftwarePackage();
-			
-			pkg.sourcetype = (int) SoftwarePackage.SourceType.local;
-			pkg.location = @"c:\packages\orca";
-			pkg.installfile = "Orca30.msi";
-			pkg.version = "3.0.1234";
-			
-			// Generic data
-			SoftwareProduct prod = new SoftwareProduct();
-			prod.company = "Microsoft";
-			prod.product = "Orca (Product d)";
-			
-			ImportSoftware(sr, pkg, prod);
-*/
 			return 0;
+		}
+
+		public static FileData ImportFile (string filepath) {
+			StreamReader reader = new StreamReader(filepath);
+			string line;
+			while ((line = reader.ReadLine()) != null) {
+				// KeyValuePair kvp = parseImportLine(line);
+			}
+			return new FileData();
 		}
 
 		public static void ImportSoftware (SoftwareRelease rel, SoftwarePackage pak, SoftwareProduct prod) {
@@ -327,54 +272,92 @@ else
 		}
 	}
 
+	class FileData {
+		public SoftwareProduct product;
+		
+		public FileData () {
+			product = new SoftwareProduct();
+			SoftwareComponentGuid = new Guid();
+		}
+		
+		public Guid SoftwareComponentGuid;
+		
+	}
+	
 	class DatabaseAPI {
-        public static DataTable GetTable(string sqlStatement) {
-            DataTable t = new DataTable();
-            try {
-                using (DatabaseContext context = DatabaseContext.GetContext()) {
-                    SqlCommand cmdAllResources = context.CreateCommand() as SqlCommand;
-                    cmdAllResources.CommandText = sqlStatement;
+		public static DataTable GetTable(string sqlStatement) {
+			DataTable t = new DataTable();
+			try {
+				using (DatabaseContext context = DatabaseContext.GetContext()) {
+					SqlCommand cmdAllResources = context.CreateCommand() as SqlCommand;
+					cmdAllResources.CommandText = sqlStatement;
 
-                    using (SqlDataReader r = cmdAllResources.ExecuteReader()) {
-                        t.Load(r);
-                    }
-                }
-                return t;
-            }
-            catch {
-                throw new Exception("Failed to execute SQL command...");
-            }
-        }
+					using (SqlDataReader r = cmdAllResources.ExecuteReader()) {
+						t.Load(r);
+					}
+				}
 
-        public static int ExecuteNonQuery(string sqlStatement) {
-            try {
-                using (DatabaseContext context = DatabaseContext.GetContext()) {
-                    SqlCommand sql_cmd = context.CreateCommand() as SqlCommand;
-                    sql_cmd.CommandText = sqlStatement;
+				return t;
+			}
+			catch {
+				throw new Exception("Failed to execute SQL command...");
+			}
+		}
 
-                    return sql_cmd.ExecuteNonQuery();
-                }
-            } catch {
-                throw new Exception("Failed to execute non query SQL command...");
-            }
+		public static int ExecuteNonQuery(string sqlStatement) {
+			try {
+				using (DatabaseContext context = DatabaseContext.GetContext()) {
+					SqlCommand sql_cmd = context.CreateCommand() as SqlCommand;
+					sql_cmd.CommandText = sqlStatement;
 
-        }
+					return sql_cmd.ExecuteNonQuery();
+				}
+			}
+			catch {
+				throw new Exception("Failed to execute non query SQL command...");
+			}
+		}
 
-        public static int ExecuteScalar(string sqlStatement) {
-            try {
-                using (DatabaseContext context = DatabaseContext.GetContext()) {
-                    SqlCommand cmd = context.CreateCommand() as SqlCommand;
+		public static int ExecuteScalar(string sqlStatement) {
+			try {
+				using (DatabaseContext context = DatabaseContext.GetContext()) {
+					SqlCommand cmd = context.CreateCommand() as SqlCommand;
 
-                    cmd.CommandText = sqlStatement;
-                    Object result = cmd.ExecuteScalar();
+					cmd.CommandText = sqlStatement;
+					Object result = cmd.ExecuteScalar();
 
-                    return Convert.ToInt32(result);
-                }
-            } catch (Exception e) {
-                Console.WriteLine("Error: {0}\nException message = {1}\nStack trace = {2}.", e.Message, e.InnerException, e.StackTrace);
-                throw new Exception("Failed to execute scalar SQL command...");
-            }
-        }
-    }
-
+					return Convert.ToInt32(result);
+				}
+			}
+			catch (Exception e) {
+				Console.WriteLine("Error: {0}\nException message = {1}\nStack trace = {2}.", e.Message, e.InnerException, e.StackTrace);
+				throw new Exception("Failed to execute scalar SQL command...");
+			}
+		}
+	}
 }
+
+
+
+/* OLD TEST CODE - Worth keeping for now
+
+			// Software Release details
+			SoftwareRelease sr = new SoftwareRelease();
+			sr.name = "Orca 3.0d";
+			sr.description = "Software release resource for Orca 3.0";
+			
+			// Software Package details
+			SoftwarePackage pkg = new SoftwarePackage();
+			
+			pkg.sourcetype = (int) SoftwarePackage.SourceType.local;
+			pkg.location = @"c:\packages\orca";
+			pkg.installfile = "Orca30.msi";
+			pkg.version = "3.0.1234";
+			
+			// Generic data
+			SoftwareProduct prod = new SoftwareProduct();
+			prod.company = "Microsoft";
+			prod.product = "Orca (Product d)";
+			
+			ImportSoftware(sr, pkg, prod);
+*/

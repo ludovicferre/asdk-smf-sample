@@ -1,0 +1,12 @@
+### Skip lines starting with #
+
+# and empty lines
+
+
+# Product details
+product_name = "Symantec CWoC"
+product_description = "This is a test product created via CWoC Software Importer tool."
+product_company = "Symantec CWoC"
+
+# Associated software component
+software_component_guid = "216C23FC-1754-48F1-817A-19594CD09BCE";
