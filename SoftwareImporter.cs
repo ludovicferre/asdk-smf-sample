@@ -24,9 +24,14 @@ namespace Symantec.CWoC {
 			string product_version = "";
 
 			string software_component_guid = "FFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFFF";
+			
+			string filter_product = "%";
+			string filter_version = "%";
+			string filter_company = "%";
 
 			bool do_associate_component = false;
 			bool has_product_version = false;
+			bool has_product_filter = false;
 
 			if (Args.Length > 0) {
 				foreach (string arg in Args) {
@@ -43,6 +48,15 @@ namespace Symantec.CWoC {
 					} else if (arg.StartsWith("/prodver=")) {
 						product_version = arg.Substring("/prodver=".Length);
 						has_product_version = true;
+					} else if (arg.StartsWith("/filterprod=")) {
+						filter_product = arg.Substring("/filterprod=".Length);
+						has_product_filter = true;
+					} else if (arg.StartsWith("/filterversion=")) {
+						filter_version = arg.Substring("/filterversion=".Length);
+						has_product_filter = true;
+					} else if (arg.StartsWith("/filtercie=")) {
+						filter_company = arg.Substring("/filtercie=".Length);
+						has_product_filter = true;
 					}
 				}
 			} else {
@@ -76,6 +90,16 @@ namespace Symantec.CWoC {
 				string sql_insert_version = String.Format(sql.ins_product_version, productDetails.Guid, product_version);
 				DatabaseAPI.ExecuteNonQuery(sql_insert_version);
 			}
+			
+			if (has_product_filter) {
+				string prod_filter = GetProductNameFilter(filter_product);
+				string sql_filter = String.Format(sql.product_filter_query, prod_filter, filter_company, filter_version);
+				
+				string sql_insert_filter = String.Format(sql.ins_product_filter, productDetails.Guid, filter_product, filter_company, filter_version, sql_filter);
+				
+				Console.WriteLine(sql_insert_filter);
+				DatabaseAPI.ExecuteNonQuery(sql_insert_filter);
+			}
 
 /*
 			// Add the inventory dataclass entries
@@ -90,6 +114,17 @@ namespace Symantec.CWoC {
 			
 			// Ensure we have a clear entry in the ResourceUpdateSummary table too
 */			return 0;
+		}
+		
+		public static string GetProductNameFilter(string name_filter) {
+			char [] delim = {'+'};
+			string [] name_filters = name_filter.Split(delim);
+			
+			StringBuilder b = new StringBuilder();
+			foreach (String name in name_filters) {
+				b.AppendFormat(sql.product_filter_base, name);
+			}
+			return b.ToString();
 		}
 
 		public static void ImportSoftware (SoftwareRelease rel, SoftwarePackage pak, SoftwareProduct prod) {

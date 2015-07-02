@@ -13,7 +13,7 @@ else
 		#endregion
 
 		#region public static readonly string inventory_query = @"
-		public static readonly string inventory_query = @"
+		public static readonly string product_filter_query = @"
 SELECT	   component.Guid
 		  ,component.Name
 		  ,component.ResourceTypeGuid
@@ -37,19 +37,42 @@ SELECT	   component.Guid
 		  FROM vRM_Company_Item vci
 		  JOIN ResourceAssociation ra
 		    ON ra.ChildResourceGuid = vci.Guid 
-		   AND ra.ResourceAssociationTypeGuid = '292dbd81-1526-423a-ae6d-f44eb46c5b16'
+		   AND ra.ResourceAssociationTypeGuid = ''292dbd81-1526-423a-ae6d-f44eb46c5b16''
 		) company
     ON company.ComponentGuid = component.Guid
   LEFT JOIN Inv_Software_Component scVersion
     ON scVersion._ResourceGuid = component.Guid
  Where 1 = 1
-   AND Lower(component.Name) Like Lower('{0}')
-   AND Lower(ISNULL(company.Name, '')) Like Lower('{1}') 
-   AND Lower(ISNULL(scVersion.Version, '')) Like Lower('{2}') 
+   {0}
+   AND Lower(ISNULL(company.Name, '''')) Like Lower(''%{1}%'') 
+   AND Lower(ISNULL(scVersion.Version, '''')) Like Lower(''{2}%'') 
  Order By component.Name Asc
  ";
 		#endregion
 
+		#region public static readonly string product_filter_base = @"
+		public static readonly string product_filter_base = @"
+		   AND Lower(component.Name) Like Lower(''%{0}%'')";
+		#endregion
+
+		#region public static readonly string ins_product_filter = @"
+		public static readonly string ins_product_filter = @"
+if exists (select 1 from Inv_SoftwareProductFilter where _ResourceGuid = '{0}')
+begin
+	update Inv_SoftwareProductFilter set NameFilter = '{1}', CompanyFilter = '{2}', VersionFilter = '{3}', SQLQueryFilter = '{4}' where _ResourceGuid = '{0}'
+	update ResourceUpdateSummary set ModifiedDate = getdate(), [RowCount] = 1, datahash = '', DataLastChangedDate = getdate()
+	 where ResourceGuid = '{0}' and InventoryClassGuid = 'F27B37C9-7896-4C26-A3A5-0EC51232C4D2'
+end
+else
+begin
+	insert Inv_SoftwareProductFilter (_ResourceGuid, NameFilter, CompanyFilter, VersionFilter, SQLQueryFilter)
+	values ('{0}', '{1}', '{2}', '{3}', '{4}')
+	insert ResourceUpdateSummary (inventoryclassguid, ResourceGuid, CreatedDate, ModifiedDate, [RowCount], DataLastChangedDate)
+	values ('F27B37C9-7896-4C26-A3A5-0EC51232C4D2', '{0}', getdate(), getdate(), 1, GetDate())
+end
+";	
+		#endregion
+		
 		#region public static readonly string associate_component = @"
 		public static readonly string associate_component = @"
 insert ResourceAssociation
