@@ -21,8 +21,12 @@ namespace Symantec.CWoC {
 			string company_name = "";
 			string product_name = "";
 			string product_description = "";
+			string product_version = "";
 
 			string software_component_guid = "FFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFFF";
+
+			bool do_associate_component = false;
+			bool has_product_version = false;
 
 			if (Args.Length > 0) {
 				foreach (string arg in Args) {
@@ -33,8 +37,13 @@ namespace Symantec.CWoC {
 						product_name = arg.Substring("/prodname=".Length);
 					} else if (arg.StartsWith("/proddescript=")) {
 						product_description = arg.Substring("/proddescript=".Length);
-					} else if (arg.StartsWith("/assocompnt="))
+					} else if (arg.StartsWith("/assocompnt=")) {
 						software_component_guid = arg.Substring("/assocompnt=".Length);
+						do_associate_component = true;
+					} else if (arg.StartsWith("/prodver=")) {
+						product_version = arg.Substring("/prodver=".Length);
+						has_product_version = true;
+					}
 				}
 			} else {
 				Console.WriteLine(HELP_MSG);
@@ -45,9 +54,7 @@ namespace Symantec.CWoC {
 				Console.WriteLine(HELP_MSG);
 				return -1;
 			}
-			bool associate_component = false;
-			if (software_component_guid == "FFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFFF")
-				associate_component = false;
+
 			// Create the Software Product first and mark as managed
 			SoftwareProductManagementLib managementLib = new SoftwareProductManagementLib();
 			SoftwareProductDetails productDetails = managementLib.CreateSoftwareProduct(product_name, product_description, company_name);
@@ -60,9 +67,14 @@ namespace Symantec.CWoC {
 			DatabaseAPI.ExecuteNonQuery(sql_manage_product);
 
 			// Associate Software Component if needed
-			if (associate_component) {
+			if (do_associate_component) {
 				string sql_associate_component = String.Format(sql.associate_component, software_component_guid, productDetails.Guid);
 				DatabaseAPI.ExecuteNonQuery(sql_associate_component);
+			}
+			
+			if (has_product_version) {
+				string sql_insert_version = String.Format(sql.ins_product_version, productDetails.Guid, product_version);
+				DatabaseAPI.ExecuteNonQuery(sql_insert_version);
 			}
 
 /*

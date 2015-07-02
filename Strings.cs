@@ -66,6 +66,23 @@ else
 	insert Inv_SoftwareProductFilter (_ResourceGuid, NameFilter, CompanyFilter, VersionFilter, SQLQueryFilter)	values ('{0}', '{1}', '{2}', '{3}', '{4}')
 ";
 		#endregion
+
+		#region public static readonly string ins_product_version = @"
+		public static readonly string ins_product_version = @"
+		if exists (select 1 from Inv_Software_Product_Version where _ResourceGuid = '{0}')
+		begin
+			update Inv_Software_Product_Version set version = '{1}' where _ResourceGuid = '{0}'
+			update ResourceUpdateSummary set ModifiedDate = getdate(), [RowCount] = 1, datahash = '', DataLastChangedDate = getdate()
+			 where ResourceGuid = '{0}' and InventoryClassGuid = '135F104C-3833-4DD4-B8DE-7621C90D456E'
+		end
+		else
+		begin
+			insert Inv_Software_Product_Version (_ResourceGuid, Version) values('{0}', '{1}')
+			insert ResourceUpdateSummary (inventoryclassguid, ResourceGuid, CreatedDate, ModifiedDate, [RowCount], DataLastChangedDate)
+			values ('135F104C-3833-4DD4-B8DE-7621C90D456E', '{0}', getdate(), getdate(), 1, GetDate())
+		end
+		";
+		#endregion
 	} 		
 		
 }
