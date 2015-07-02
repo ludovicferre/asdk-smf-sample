@@ -52,7 +52,10 @@ SELECT	   component.Guid
 
 		#region public static readonly string associate_component = @"
 		public static readonly string associate_component = @"
-";
+insert ResourceAssociation
+		(ResourceAssociationTypeGuid, ChildResourceGuid, ParentResourceGuid, CreatedDate)
+values
+		('9D67B0C6-BEFF-4FCD-86C1-4A40028FE483', '{0}', '{1}', GETDATE()) -- Software Product Contains Software Component";
 		#endregion
 
 		#region public static readonly string set_software_product_filter = @"

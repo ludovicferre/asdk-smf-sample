@@ -14,21 +14,41 @@ namespace Symantec.CWoC {
 	class SoftwareImporter {
 		public static readonly string prodtocomp_ratguid = "9D67B0C6-BEFF-4FCD-86C1-4A40028FE483";
 		public static readonly string prodtocomp = "Software Product Contains Software Component";
+		
+		public static readonly string HELP_MSG = "Command line ERROR";
 
 		public static int Main(string [] Args) {
-			// Read data from file provided at command line
-			string import_file = "product.txt";
-			if (Args.Length == 1) {
-				import_file = Args[0];
+			string company_name = "";
+			string product_name = "";
+			string product_description = "";
+
+			string software_component_guid = "FFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFFF";
+
+			if (Args.Length > 0) {
+				foreach (string arg in Args) {
+					string _arg = arg.ToLower();
+					if (arg.StartsWith("/corpname=")) {
+						company_name = arg.Substring("/corpname=".Length);
+					} else if (arg.StartsWith("/prodname=")) {
+						product_name = arg.Substring("/prodname=".Length);
+					} else if (arg.StartsWith("/proddescript=")) {
+						product_description = arg.Substring("/proddescript=".Length);
+					} else if (arg.StartsWith("/assocompnt="))
+						software_component_guid = arg.Substring("/assocompnt=".Length);
+				}
+			} else {
+				Console.WriteLine(HELP_MSG);
+				return 0;
 			}
-
-			string company_name = "Symantec CWoC";
-			string product_name = "Software Importer";
-			string product_description = "A software management program to create products from file";
-
-			string software_component_guid = "";
-
-			// Create the Software Product first
+			
+			if (product_name == "" || company_name == "") {
+				Console.WriteLine(HELP_MSG);
+				return -1;
+			}
+			bool associate_component = false;
+			if (software_component_guid == "FFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFFF")
+				associate_component = false;
+			// Create the Software Product first and mark as managed
 			SoftwareProductManagementLib managementLib = new SoftwareProductManagementLib();
 			SoftwareProductDetails productDetails = managementLib.CreateSoftwareProduct(product_name, product_description, company_name);
 
@@ -36,17 +56,20 @@ namespace Symantec.CWoC {
 			Console.WriteLine("Product name = {0}", productDetails.Name);
 			Console.WriteLine("Product guid = {0}", productDetails.Guid.ToString());
 
-			// Mark as managed in all cases (existing entry or not)
 			string sql_manage_product = String.Format(sql.set_product_managed, productDetails.Guid);
 			DatabaseAPI.ExecuteNonQuery(sql_manage_product);
 
 			// Associate Software Component if needed
-			string sql_associate_component = String.Format(sql.associate_component, productDetails.Guid);
+			if (associate_component) {
+				string sql_associate_component = String.Format(sql.associate_component, software_component_guid, productDetails.Guid);
+				DatabaseAPI.ExecuteNonQuery(sql_associate_component);
+			}
 
+/*
 			// Add the inventory dataclass entries
-			string SoftwareNameQueryString = "";
-			string CompanyQueryString = "";
-			string VersionQueryString = "";
+			string SoftwareNameQueryString = "TestName";
+			string CompanyQueryString = "Symantec CWoC";
+			string VersionQueryString = "2";
 
 			string sql_inventory_query = String.Format(sql.inventory_query, SoftwareNameQueryString, CompanyQueryString, VersionQueryString);
 
@@ -54,16 +77,7 @@ namespace Symantec.CWoC {
 
 			
 			// Ensure we have a clear entry in the ResourceUpdateSummary table too
-			return 0;
-		}
-
-		public static FileData ImportFile (string filepath) {
-			StreamReader reader = new StreamReader(filepath);
-			string line;
-			while ((line = reader.ReadLine()) != null) {
-				// KeyValuePair kvp = parseImportLine(line);
-			}
-			return new FileData();
+*/			return 0;
 		}
 
 		public static void ImportSoftware (SoftwareRelease rel, SoftwarePackage pak, SoftwareProduct prod) {
