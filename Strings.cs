@@ -75,10 +75,14 @@ end
 		
 		#region public static readonly string associate_component = @"
 		public static readonly string associate_component = @"
-insert ResourceAssociation
+if not exists (select 1 from ResourceAssociation where ResourceAssociationTypeGuid = '9D67B0C6-BEFF-4FCD-86C1-4A40028FE483' and ChildResourceGuid = '{0}' and parentresourceguid = '{1}')
+begin
+	insert ResourceAssociation
 		(ResourceAssociationTypeGuid, ChildResourceGuid, ParentResourceGuid, CreatedDate)
-values
-		('9D67B0C6-BEFF-4FCD-86C1-4A40028FE483', '{0}', '{1}', GETDATE()) -- Software Product Contains Software Component";
+	values
+		('9D67B0C6-BEFF-4FCD-86C1-4A40028FE483', '{0}', '{1}', GETDATE()) -- Software Product Contains Software Component
+end
+";
 		#endregion
 
 		#region public static readonly string set_software_product_filter = @"

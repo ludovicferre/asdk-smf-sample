@@ -51,6 +51,6 @@ set ver3=v4.0_7.6.1383.0__99b1e4cc0d03f223
 
 
 :build
-cmd /c %csc% /reference:%gac%\%smf%\%ver3%\%smf%.dll /reference:%gac%\%ans%\%ver1%\%ans%.dll /reference:%gac%\%acm%\%ver1%\%acm%.dll /reference:%gac%\%adb%\%ver1%\%adb%.dll /out:SoftwareImporter-%build%.exe *.cs
+cmd /c %csc% /reference:%gac%\%smf%\%ver3%\%smf%.dll /reference:%gac%\%ans%\%ver1%\%ans%.dll /reference:%gac%\%acm%\%ver1%\%acm%.dll /reference:%gac%\%adb%\%ver1%\%adb%.dll /out:SoftwareProductCLI-%build%.exe *.cs
 
 :end

@@ -15,9 +15,69 @@ namespace Symantec.CWoC {
 		public static readonly string prodtocomp_ratguid = "9D67B0C6-BEFF-4FCD-86C1-4A40028FE483";
 		public static readonly string prodtocomp = "Software Product Contains Software Component";
 		
-		public static readonly string HELP_MSG = "Command line ERROR";
+		public static readonly string HELP_MSG = @"
+Welcome to the Software Product CLI tools.
+
+This tool allows you to create or modify software products by Company and Name.
+The tool contains multiple features available from the command line, high-
+lighted and described below:
+
+    * Add / modify a software product
+    * Add / modify a product version
+    * Associate the product with a Software Release
+    * Add / modify the Software Selection filter
+
+The following arguments are mandatory:
+
+    /corpname='Company name'
+        
+        If a company with the same name find it will be used, if not a new
+        company will be created with the provided string.
+    
+    /prodname='Product name'
+    
+        The name of the product to be created or retrieved.
+        
+    Note! Existing products are found matching _both_ the product name and 
+    company name.
+
+While all of the following switches are optional:
+    
+    /proddescript='Description string for the product to be created / modified'
+    
+    /assocompnt='<software release guid>'
+
+        The guid of the software release to associate with the product. This
+		will allow the product to appear in the 'Deliverable Product' view on
+		the Management Console.
+		
+		Note that you can add software releases running the tool multiple times
+		i.e. only modify the guid at each run to add a release per execution.
+    
+    /prodver='Product version string'
+    
+    /filterprod='Software Release filter string'
+    
+        This string can include multiple search terms seperate with the + sign.
+        
+        For example: 'symantec+agent' will match software installation where 
+        the Software Name contain 'symantec' _and_ 'agent'.
+    
+    /filtercie='Company name'
+    
+        This string with further filter the installed software (by name) to
+        ensure the software is from company 'Company name'.
+    
+    /filterversion='Version string'
+    
+        This string will limit the installed software data based on the version
+        string. Note that the match will work stricly from the beginning of the
+        software version.
+    
+";
 
 		public static int Main(string [] Args) {
+			#region Core variables
 			string company_name = "";
 			string product_name = "";
 			string product_description = "";
@@ -32,6 +92,7 @@ namespace Symantec.CWoC {
 			bool do_associate_component = false;
 			bool has_product_version = false;
 			bool has_product_filter = false;
+			#endregion
 
 			if (Args.Length > 0) {
 				foreach (string arg in Args) {
@@ -97,7 +158,6 @@ namespace Symantec.CWoC {
 				
 				string sql_insert_filter = String.Format(sql.ins_product_filter, productDetails.Guid, filter_product, filter_company, filter_version, sql_filter);
 				
-				Console.WriteLine(sql_insert_filter);
 				DatabaseAPI.ExecuteNonQuery(sql_insert_filter);
 			}
 
