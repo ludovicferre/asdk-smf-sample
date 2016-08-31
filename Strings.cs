@@ -110,6 +110,34 @@ else
 		end
 		";
 		#endregion
+
+		#region public static readonly string undefined_software_query_base = @"
+		public static readonly string undefined_software_query_base = @"
+SELECT 
+		  ci.[Name] AS [ComponentName]
+		, ci.[Guid] AS [ComponentGuid]
+--		, REPLACE(ci.name, isnull(cv.Version, ''), isnull(cast(cv.MajorVersion as varchar(256)), '')) as '-> PRODUCT NAME',
+		, comp.Name AS ManufacturerName
+		, cv.MajorVersion
+		, cv.MinorVersion
+		, cv.Version
+  FROM vRM_Software_Component_Item ci 
+  JOIN Inv_Software_Component_State scs 
+    ON scs._ResourceGuid = ci.Guid 
+   AND scs.IsManaged = 0 
+  LEFT JOIN Inv_Software_Component cv
+    ON cv._ResourceGuid = ci.Guid 
+  LEFT JOIN (
+		SELECT ra.ParentResourceGuid, rc.Guid, rc.Name 
+		  FROM RM_ResourceCompany rc 
+		  JOIN ResourceAssociation ra 
+			ON rc.Guid = ra.ChildResourceGuid 
+		   AND ra.ResourceAssociationTypeGuid = '292dbd81-1526-423a-ae6d-f44eb46c5b16'
+	   ) comp 
+    ON comp.ParentResourceGuid = ci.Guid
+ WHERE ci.ProductGuid IN ('AD0DD85E-43CA-4AF4-A66C-DDDCAF8C2F57','D0E33520-C160-11D2-8612-00104B74A9DF')
+";
+		#endregion
 	} 		
 		
 }
