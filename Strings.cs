@@ -113,10 +113,9 @@ else
 
 		#region public static readonly string undefined_software_query_base = @"
 		public static readonly string undefined_software_query_base = @"
-SELECT 
+SELECT
 		  ci.[Name] AS [ComponentName]
 		, ci.[Guid] AS [ComponentGuid]
---		, REPLACE(ci.name, isnull(cv.Version, ''), isnull(cast(cv.MajorVersion as varchar(256)), '')) as '-> PRODUCT NAME',
 		, comp.Name AS ManufacturerName
 		, cv.MajorVersion
 		, cv.MinorVersion
@@ -136,6 +135,8 @@ SELECT
 	   ) comp 
     ON comp.ParentResourceGuid = ci.Guid
  WHERE ci.ProductGuid IN ('AD0DD85E-43CA-4AF4-A66C-DDDCAF8C2F57','D0E33520-C160-11D2-8612-00104B74A9DF')
+   AND (comp.Name like '{0}' or comp.Name = '{1}'{3})
+   AND ci.Name like '{2}'
 ";
 		#endregion
 	} 		

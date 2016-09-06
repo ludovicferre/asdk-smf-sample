@@ -12,35 +12,149 @@ using Altiris.NS.ContextManagement;
 
 namespace Symantec.CWoC {
 	class SoftwareImporter {	
-		#region public static readonly string HELP_MSG
-		public static readonly string HELP_MSG = @"
-Software Product creation tool
+		public static readonly string VERSION = @"0.6";
+		private static bool DEBUG = true;
+        #region public static readonly string HELP_MSG
+        public static readonly string HELP_MSG = @"
+Unknown Software Handler version " + VERSION + @"
 
 EXPORT function:
 
     Phase 1 of any automated product creation requires the output from the
-	unknown software component details to a CSV foirmat for administrator
-	validation. This is to ensure that the created product have been 
-	reviewed and that the products to be created can be reviewed before they
-	are committed to the Symantec CMDB.
-	
-	By default the tool will output data to a UTF-8 CSV file (with headers)
-	named output.csv.
-	
-	The following command lines arguments are available for this export:
-	
-		/version_none
-		/version_major
-		/version_majorminor
-		/version_exact
-		
-		/corpname=<company name>
-		/corpfilter=<sql like filter>
+    unknown software component details to a CSV format for administrator
+    validation. This is to ensure that the created product have been 
+    reviewed and that the products to be created can be reviewed before they
+    are committed to the Symantec CMDB.
+    
+    By default the tool will output data to a UTF-8 CSV file (with headers)
+    named output.csv.
+    
+    The following command line is required for the export process to start:
+    
+        /export
+        
+            Start the export process. If no other command line arguments are
+            provided the export will use the Major version mode (as if using
+            /version_major).
+    
+    The following command lines arguments are available for this export:
+
+        /exportfile=<path to write the output file to>
+
+        /corpname=<company name>
+        
+            Match this string with the Company Name assocated with the software
+            component to be exported. Note that this is an equality match.
+
+        /corpfilter=<sql like filter>
+        
+            You can use SQL wildcard to specify which company(ies) should be
+            exported. Wildcard as % to match a string of any length and _ to
+            match a single string.
+        
+        /nullcorp
+        
+            Export components fro which a company does not exist yet.
+        
+        /nullcorp=<catchall company name>
+        
+            Export components fro which a company does not exist yet and set it
+            to >catchall company name> in the output file.
+        
+        /componentfilter=<sql like filter>
+
+            You can use SQL wildcard to specify which components should be
+            exported. Wildcard as % to match a string of any length and _ to
+            match a single string.
+        
+        /version_none
+        
+            Remove any version data based on the Inv_Software_Component.Version
+            field. In all cases the Software Product and product filter will
+            not contain any version.
+            
+            If the version is not available the product name will use the
+            component name as is.
+            
+            If the version is not the same in the component name as in the 
+            Inv_Software_Component.Version table the product name will use the
+            component name as is.
+            
+            If the version is present  in the software component name it will
+            be remove before it is used as the product name.
+
+        /version_major
+        
+            Use the data from Inv_Software_Component.MajorVersion as the 
+            product and filter version string.
+            
+            If the version is not available the product name will use the
+            component name as is.
+            
+            If the version is not the same in the component name as in the 
+            Inv_Software_Component.Version table the product name will use the
+            component name as is.
+            
+            If the version is present  in the software component name it will
+            be replaced by the MajorVersion before it is used as the product
+            name.
+
+        /version_majorminor
+
+            Use the data from Inv_Software_Component.MajorVersion and 
+            the Inv_Software_Component.MinorVersion seperated by a dot as the
+            product and filter version string.
+            
+            If the version is not available the product name will use the
+            component name as is.
+            
+            If the version is not the same in the component name as in the 
+            Inv_Software_Component.Version table the product name will use the
+            component name as is.
+            
+            If the version is present in the software component name it will
+            be replaced by the compound MajorVersion.MinorVersion before it is
+            used as the product name.
+
+        /version_exact
+        
+            Use the data from Inv_Software_Component.Version as the 
+            product and filter version string.
+            
+            The Software Product is created with the Component name as-is.
 
 IMPORT and CREATION:
 
+    Phase 2 of the automated product creation requires an input.csv file to be
+    placed in the running folder following the csv schema provided during the 
+    export phase.
+    
+    The following command line is required for the import process to start:
+    
+        /import
+
+            Start the import and creation process. If no other command line 
+            arguments are provided the import run for each line in the input
+            file.
+
+    The following command line allow you to control the input and actions taken
+    by the tool:
+
+        /importfile=<path to UTF-8 csv>
+        
+            Specify a custom location for the input file.
+
+        /dryrun
+        
+            Do not create any software product, simply output the data to the
+            console.
+
+        /testrun
+        
+            Run the import / creation process for up to 10 components / 
+            products and exits.
 ";
-		#endregion
+        #endregion
 
 		public static readonly string CSV_HEAD = "\"component_name\"\t\"product_name\"\t\"product_filter\"\t\"product_version\"\t\"component_company\"\t\"component_major_version\"\t\"component_minr\"\t\"component_vers\"\t\"component_guid\"";
 		
@@ -55,21 +169,34 @@ IMPORT and CREATION:
 			
 			if (conf.export_mode == true) {
 				// Craft the export SQL based on the CLI configuration
-				string unk_sql = String.Format(sql.undefined_software_query_base, conf.company_filter, conf.company_name);
+				string nullcorp_sqlstring = "";
+				if (conf.nullcorp_allowed) {
+					nullcorp_sqlstring = " or comp.name is null";
+				}
+				string unk_sql = String.Format(sql.undefined_software_query_base, conf.company_filter, conf.company_name, conf.component_filter, nullcorp_sqlstring);
 				
-				// Console.WriteLine(unk_sql);
+				if (DEBUG) {
+					Console.WriteLine(unk_sql);
+				}
 				DataTable unknown_components = DatabaseAPI.GetTable(unk_sql);
 
 				// Open the output file for writing as UTF-8
-				StreamWriter writer = new StreamWriter(@"output.csv", false, Encoding.UTF8);
+				StreamWriter writer = new StreamWriter(conf.export_path, false, Encoding.UTF8);
 
 				// Write the CSV file header for clarity
 				WriteCSVOutput(CSV_HEAD, writer);
 				
 				// Output each line with the computed product name and filter strings
 				foreach (DataRow r in unknown_components.Rows) {
-					
 					compute_product_data c = new compute_product_data(r, conf.versioning_mode);
+
+					if (c.component_company == "") {
+						c.component_company = conf.nullcorp_name;
+						if (DEBUG) {
+							//Console.WriteLine("Found a component company empty - replacing with {0}.", conf.nullcorp_name);
+						}
+					}
+
 					WriteCSVOutput(
 						"\"" + c.component_name + "\"\t" +
 						"\"" + c.product_name + "\"\t" +
@@ -88,7 +215,7 @@ IMPORT and CREATION:
 				return 0;
 			} else {
 				// Import data from CSV and run the product creation based on that.
-				string path = "input.csv";
+				string path = conf.import_path;
 				string [] in_data;
 				
 				int i = 0;
@@ -191,12 +318,12 @@ IMPORT and CREATION:
 				product_description = "";
 				product_version = "";
 				
-				component_name    = r[0].ToString();
+				component_name    = r[0].ToString().Replace("\r\n", "");
 				component_guid    = r[1].ToString();
-				component_company = r[2].ToString();
-				component_major   = r[3].ToString();
-				component_minor   = r[4].ToString();
-				component_version = r[5].ToString();
+				component_company = r[2].ToString().Replace("\r\n", "");
+				component_major   = r[3].ToString().Replace("\r\n", "");
+				component_minor   = r[4].ToString().Replace("\r\n", "");
+				component_version = r[5].ToString().Replace("\r\n", "");
 				
 				if (version_mode == Versioning.None) {	
 					if (component_version.Length > 0) {
@@ -275,37 +402,12 @@ IMPORT and CREATION:
 			return b.ToString();
 		}
 
-		public static void ImportSoftware (SoftwareRelease rel, SoftwarePackage pak, SoftwareProduct prod) {
-			int MergeAction = 0; // Create = 0; Merge = 1
-			Guid ReleaseMergeTo = Guid.Empty; // Guid of release to merge to
-
-			try {
-				SoftwareComponentManagementLib compLib = new SoftwareComponentManagementLib();
-				SoftwareComponentDetails details = compLib.ImportSoftwareRelease(
-					rel.name,
-					rel.description,
-					pak.sourcetype,
-					pak.location,
-					pak.folder,
-					pak.installfile,
-					pak.version,
-					prod.company,
-					prod.product,
-					MergeAction,
-					ReleaseMergeTo);
-
-				Console.WriteLine("Created software release with guid {0}", details.Guid.ToString());
-			}
-			catch (Exception e) {
-				Console.WriteLine(e.Message);
-				Console.WriteLine(e.StackTrace);
-			}
-		}
-
 		public static CLIConfig GetCLIConfig (string [] Args) {
 			CLIConfig conf = new CLIConfig();
-			foreach (string arg in Args) {
-				string _arg = arg.ToLower();
+			foreach (string Arg in Args) {
+				string arg = Arg.ToLower();
+				
+				//Export control switches
 				if (arg == "/dryrun") {
 					conf.dryrun = true;
 					conf.testrun = false;
@@ -314,12 +416,31 @@ IMPORT and CREATION:
 					conf.testrun = true;
 					conf.dryrun = false;
 					conf.export_mode = false;
+				// Import & export core control switches
 				} else if (arg =="/import") {
 					conf.export_mode = false;
 					conf.display_help = false;
 				} else if (arg =="/export") {
 					conf.export_mode = true;
 					conf.display_help = false;
+				} else if (arg.StartsWith("/importfile=")) {
+					conf.import_path = arg.Substring("/importfile=".Length);
+				} else if (arg.StartsWith("/exportfile=")) {
+					conf.export_path = arg.Substring("/exportfile=".Length);
+				// Export filter controls
+				} else if (arg.StartsWith("/corpname=")) {
+					conf.company_name = arg.Substring("/corpname=".Length);
+				} else if (arg.StartsWith("/corpfilter=")) {
+					conf.company_filter = arg.Substring("/corpfilter=".Length);
+				} else if (arg.StartsWith("/componentfilter=")) {
+					conf.component_filter = arg.Substring("/componentfilter=".Length);
+				} else if (arg=="/nullcorp") {
+					conf.nullcorp_allowed = true;
+				} else if (arg.StartsWith("/nullcorp=")) {
+					// Use the Arg as-is (i.e. not lower case)
+					conf.nullcorp_name = Arg.Substring("/nullcorp=".Length);
+					conf.nullcorp_allowed = true;
+				// Version control switches
 				} else if (arg =="/version_exact") {
 					conf.versioning_mode = Versioning.Exact;
 				} else if (arg == "/version_major") {
@@ -328,17 +449,24 @@ IMPORT and CREATION:
 					conf.versioning_mode = Versioning.Major_Minor;
 				} else if (arg == "/version_none") {
 					conf.versioning_mode = Versioning.None;
-				} else if (arg.StartsWith("/corpname=")) {
-					conf.company_name = arg.Substring("/corpname=".Length);
-				} else if (arg.StartsWith("/corpfilter=")) {
-					conf.company_filter = arg.Substring("/corpfilter=".Length);
+				// Help message control
 				} else if (arg == "/?" || arg == "/help") {
 					conf.display_help = true;
+					break;
 				}
 			}
-			if (conf.company_filter == "" && conf.company_name == "") {
-				conf.company_filter="%";
+			// Make sure that we include all company name when no filters are defined
+			if (conf.company_filter == "" && conf.company_name == "" && conf.nullcorp_allowed != true) {
+				conf.company_filter = "%";
+			} else {
+				conf.company_filter = "";
 			}
+
+/*
+	/nullcorp		
+	/nullcorp=<catchall company name>
+*/
+
 			
 			return conf;
 		}
@@ -349,8 +477,15 @@ IMPORT and CREATION:
 		public bool display_help;
 		public bool export_mode;
 		
+		public string import_path;
+		public string export_path;
+		
 		public string company_name;
 		public string company_filter;
+		public string component_filter;
+		
+		public bool nullcorp_allowed;
+		public string nullcorp_name;
 		
 		public bool dryrun;
 		public bool testrun;
@@ -362,9 +497,17 @@ IMPORT and CREATION:
 			// Initialise the config properties
 			display_help = true;
 			export_mode = true;
+			
+			import_path = "input.csv";
+			import_path = "output.csv";
 
 			company_name = "";
 			company_filter = "";
+			
+			nullcorp_allowed = false;
+			nullcorp_name = "";
+			
+			component_filter = "%";
 			
 			dryrun= false;
 			testrun = false;
@@ -380,197 +523,7 @@ IMPORT and CREATION:
 		Major_Minor,
 		Exact
 	}
-	
-	class SoftwareRelease {
-		public SoftwareRelease () {
-			_name = "";
-			_description = "";
-		}
 
-		public SoftwareRelease(string name, string description) {
-			this.name = name;
-			this.description = description;
-		}
-
-		private string _name;
-		public string name {
-			get {
-				return _name;
-			}
-
-			set {
-				if (value.Length > 255)
-					throw new System.ArgumentException("Software Release name cannot be more than 255 character long.", "SoftwareRelease");
-				_name = value;
-			}
-		}
-
-		private string _description;
-		public string description {
-			get {
-				return _description;
-			}
-
-			set {
-				if (value.Length > 255)
-					throw new System.ArgumentException("Software Release name cannot be more than 255 character long.", "SoftwareRelease");
-				_description = value;
-			}
-		}
-	}
-
-	class SoftwarePackage {
-		public enum SourceType {
-			unc = 1,
-			local = 2,
-			url = 4,
-			library = 5
-		}
-
-		public SoftwarePackage() {
-			_sourcetype = (int) SourceType.local;
-			_location = "";
-			_folder = null;
-			_installfile = null;
-			_version = "";
-		}
-
-		public SoftwarePackage(SourceType type, string location, string folder, string installfile, string version) {
-			_sourcetype = (int) type;
-			this.location = location;
-			if (folder == "" || folder == String.Empty || folder == null)
-				this.folder = null;
-			else
-				this.folder = folder;
-			this.installfile = installfile;
-			this.version = version;
-		}
-
-		private int _sourcetype;
-		public int sourcetype {
-			get {
-				return _sourcetype;
-			}
-
-			set {
-				_sourcetype = value;
-			}
-		}
-
-		private string _location;
-		public string location {
-			get {
-				return _location;
-			}
-
-			set {
-				if (_sourcetype == (int) SourceType.local && !Directory.Exists(value))
-					throw new System.ArgumentException("Package location must be a valid folder on the server.", "SoftwarePackage");
-				_location = value;
-			}
-		}
-
-		private string _folder;
-		public string folder {
-			set {
-				_folder = value;
-			}
-
-			get {
-				return _folder;
-			}
-		}
-
-		private string _installfile;
-		public string installfile {
-			set {
-				if (_sourcetype == (int) SourceType.local && !File.Exists(this.location + "\\" + value))
-					throw new System.ArgumentException("Install file must exists on the package folder on the server.", "SoftwarePackage");
-				_installfile = value;
-			}
-
-			get {
-				return _installfile;
-			}
-		}
-
-		private string _version;
-		public string version {
-			set {
-				_version = value;
-			}
-
-			get {
-				return _version;
-			}
-		}
-	}
-
-	class SoftwareProduct {
-		public SoftwareProduct () {
-			_company = "";
-			_product = "";
-			_description = "";
-		}
-
-		public SoftwareProduct (string product, string company) {
-			this.company = company;
-			this.product = product;
-			this.description = "";
-		}
-
-		public SoftwareProduct (string product, string description, string company) {
-			this.company = company;
-			this.product = product;
-			this.description = description;
-		}
-
-		private string _company;
-		public string company {
-			get {
-				return _company;
-			}
-
-			set {
-				_company = value;
-			}
-		}
-
-		private string _product;
-		public string product {
-			get {
-				return _product;
-			}
-
-			set {
-				_product = product;
-			}
-		}
-
-		private string _description;
-		public string description {
-			get {
-				return _description;
-			}
-
-			set {
-				_description = value;
-			}
-		}
-	}
-
-	class FileData {
-		public SoftwareProduct product;
-		
-		public FileData () {
-			product = new SoftwareProduct();
-			SoftwareComponentGuid = new Guid();
-		}
-		
-		public Guid SoftwareComponentGuid;
-		
-	}
-	
 	class DatabaseAPI {
 		public static DataTable GetTable(string sqlStatement) {
 			DataTable t = new DataTable();
@@ -623,28 +576,3 @@ IMPORT and CREATION:
 		}
 	}
 }
-
-
-
-/* OLD TEST CODE - Worth keeping for now
-
-			// Software Release details
-			SoftwareRelease sr = new SoftwareRelease();
-			sr.name = "Orca 3.0d";
-			sr.description = "Software release resource for Orca 3.0";
-			
-			// Software Package details
-			SoftwarePackage pkg = new SoftwarePackage();
-			
-			pkg.sourcetype = (int) SoftwarePackage.SourceType.local;
-			pkg.location = @"c:\packages\orca";
-			pkg.installfile = "Orca30.msi";
-			pkg.version = "3.0.1234";
-			
-			// Generic data
-			SoftwareProduct prod = new SoftwareProduct();
-			prod.company = "Microsoft";
-			prod.product = "Orca (Product d)";
-			
-			ImportSoftware(sr, pkg, prod);
-*/
