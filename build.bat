@@ -5,20 +5,32 @@ set ans=Altiris.NS
 set adb=Altiris.Database
 set acm=Altiris.Common
 
-
+if "%1"=="7.6" goto build-7.6
 if "%1"=="7.5" goto build-7.5
 if "%1"=="7.1" goto build-7.1
-if "%1"=="8.0" goto build-8.00
-
 
 
 :default build path
+:build-8.0
+set build=8.0
+
+set gac=C:\Windows\Microsoft.NET\assembly\GAC_MSIL
+set csc=@c:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe
+
+set atrscm=%acm%\v4.0_8.0.2298.0__d516cb311cfb6e4f\%acm%.dll
+set atrsns=%ans%\v4.0_8.0.2298.0__d516cb311cfb6e4f\%ans%.dll
+set atrsdb=%adb%\v4.0_8.0.2298.0__d516cb311cfb6e4f\%adb%.dll
+set asdksm=%smf%\v4.0_8.0.2219.0__d516cb311cfb6e4f\%smf%.dll
+
+set fullref=/reference:%gac%\%asdksm% /reference:%gac%\%atrsns% /reference:%gac%\%atrscm% /reference:%gac%\%atrsdb%
+cmd /c %csc% %fullref% /out:UnknownSoftwareHandler-%build%.exe unknownsoftwarehandler.cs strings.cs
+
+goto end
 
 :build-7.6
 set build=7.6
 
 set gac=C:\Windows\Microsoft.NET\assembly\GAC_MSIL
-
 set csc=@c:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe
 
 set ver1=v4.0_7.6.1383.0__d516cb311cfb6e4f
