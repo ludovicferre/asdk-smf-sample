@@ -9,6 +9,7 @@ using Altiris.ASDK.SMF;
 using Altiris.Common;
 using Altiris.Database;
 using Altiris.NS.ContextManagement;
+using Altiris.NS.Security;
 
 namespace Symantec.CWoC {
 	class SoftwareImporter {	
@@ -162,8 +163,17 @@ IMPORT and CREATION:
 
 			CLIConfig conf = GetCLIConfig(Args);
 			
+			if (DEBUG) {
+				conf.PrintConfig();
+			}
+			
 			if (conf.display_help) {
 				Console.WriteLine(HELP_MSG);
+				return 0;
+			}
+			
+			if (!SecurityTrusteeManager.IsUserLocalAdmin()) {
+				Console.WriteLine("This tool needs to run with LocalAdmin access to the system...");
 				return 0;
 			}
 			
@@ -178,9 +188,13 @@ IMPORT and CREATION:
 				if (DEBUG) {
 					Console.WriteLine(unk_sql);
 				}
+
 				DataTable unknown_components = DatabaseAPI.GetTable(unk_sql);
 
 				// Open the output file for writing as UTF-8
+				if (File.Exists(conf.export_path) == false) {
+					conf.export_path = @"output.csv";
+				}
 				StreamWriter writer = new StreamWriter(conf.export_path, false, Encoding.UTF8);
 
 				// Write the CSV file header for clarity
@@ -458,7 +472,7 @@ IMPORT and CREATION:
 			// Make sure that we include all company name when no filters are defined
 			if (conf.company_filter == "" && conf.company_name == "" && conf.nullcorp_allowed != true) {
 				conf.company_filter = "%";
-			} else {
+			} else if (conf.company_filter =="" && conf.company_name == "" && conf.nullcorp_allowed == true) {
 				conf.company_filter = "";
 			}
 
@@ -499,7 +513,7 @@ IMPORT and CREATION:
 			export_mode = true;
 			
 			import_path = "input.csv";
-			import_path = "output.csv";
+			export_path = "output.csv";
 
 			company_name = "";
 			company_filter = "";
@@ -515,6 +529,22 @@ IMPORT and CREATION:
 			managed_mode = true;
 			versioning_mode = Versioning.Major;
 		}
+
+		public void PrintConfig() {
+			Console.WriteLine("Display help: {0}", display_help.ToString());
+			Console.WriteLine("Export mode: {0}", export_mode.ToString());
+			Console.WriteLine("Import path: {0}", import_path.ToString());
+			Console.WriteLine("Export path: {0}", export_path.ToString());
+			Console.WriteLine("Company name: {0}", company_name.ToString());
+			Console.WriteLine("Company filter: {0}", company_filter.ToString());
+			Console.WriteLine("Component filter: {0}", component_filter.ToString());
+			Console.WriteLine("Nullcorp allowed: {0}", nullcorp_allowed.ToString());
+			Console.WriteLine("Null corp name: {0}", nullcorp_name.ToString());
+			Console.WriteLine("Dry run: {0}", dryrun.ToString());
+			Console.WriteLine("Test run: {0}", testrun.ToString());
+			Console.WriteLine("Managed mode: {0}", managed_mode.ToString());
+			Console.WriteLine("Versioning mode: {0}", versioning_mode.ToString());
+		}
 	}
 	
 	enum Versioning {
@@ -527,8 +557,9 @@ IMPORT and CREATION:
 	class DatabaseAPI {
 		public static DataTable GetTable(string sqlStatement) {
 			DataTable t = new DataTable();
+
 			try {
-				using (DatabaseContext context = DatabaseContext.GetContext()) {
+				 using (AdminDatabaseContext context = DatabaseContext<AdminDatabaseContext>.GetContext()) {
 					SqlCommand cmdAllResources = context.CreateCommand() as SqlCommand;
 					cmdAllResources.CommandText = sqlStatement;
 
@@ -546,7 +577,7 @@ IMPORT and CREATION:
 
 		public static int ExecuteNonQuery(string sqlStatement) {
 			try {
-				using (DatabaseContext context = DatabaseContext.GetContext()) {
+				 using (AdminDatabaseContext context = DatabaseContext<AdminDatabaseContext>.GetContext()) {
 					SqlCommand sql_cmd = context.CreateCommand() as SqlCommand;
 					sql_cmd.CommandText = sqlStatement;
 
@@ -560,7 +591,7 @@ IMPORT and CREATION:
 
 		public static int ExecuteScalar(string sqlStatement) {
 			try {
-				using (DatabaseContext context = DatabaseContext.GetContext()) {
+				 using (AdminDatabaseContext context = DatabaseContext<AdminDatabaseContext>.GetContext()) {
 					SqlCommand cmd = context.CreateCommand() as SqlCommand;
 
 					cmd.CommandText = sqlStatement;
