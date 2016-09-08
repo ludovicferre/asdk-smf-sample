@@ -14,7 +14,8 @@ using Altiris.NS.Security;
 namespace Symantec.CWoC {
 	class SoftwareImporter {	
 		public static readonly string VERSION = @"0.6";
-		private static bool DEBUG = true;
+		private static bool DEBUG = false;
+
         #region public static readonly string HELP_MSG
         public static readonly string HELP_MSG = @"
 Unknown Software Handler version " + VERSION + @"
@@ -44,8 +45,9 @@ EXPORT function:
 
         /corpname=<company name>
         
-            Match this string with the Company Name assocated with the software
-            component to be exported. Note that this is an equality match.
+            Match this string with the Company Name associated with the 
+            software component to be exported. Note that this is an equality
+            match.
 
         /corpfilter=<sql like filter>
         
@@ -55,12 +57,12 @@ EXPORT function:
         
         /nullcorp
         
-            Export components fro which a company does not exist yet.
+            Export components from which a company does not exist yet.
         
         /nullcorp=<catchall company name>
         
-            Export components fro which a company does not exist yet and set it
-            to >catchall company name> in the output file.
+            Export components from which a company does not exist yet and set 
+            it to <catchall company name> in the output file.
         
         /componentfilter=<sql like filter>
 
