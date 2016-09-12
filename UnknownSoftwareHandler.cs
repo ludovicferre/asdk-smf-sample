@@ -13,14 +13,24 @@ using Altiris.NS.Security;
 
 namespace Symantec.CWoC {
 	class SoftwareImporter {	
-		public static readonly string VERSION = @"0.6";
+		public static readonly string VERSION = @"0.7";
 		private static bool DEBUG = false;
 
         #region public static readonly string HELP_MSG
         public static readonly string HELP_MSG = @"
 Unknown Software Handler version " + VERSION + @"
 
-EXPORT function:
+Generic commands:
+
+    /?    Displays this help message
+    
+    /createdictionnary
+    
+        Write a sample UTF-8 dictionnary file named dictionnary.txt. You can
+        then this file to normalise the product names and remove unwanted 
+        string that can be language or component specific.
+
+EXPORT commands:
 
     Phase 1 of any automated product creation requires the output from the
     unknown software component details to a CSV format for administrator
@@ -42,6 +52,18 @@ EXPORT function:
     The following command lines arguments are available for this export:
 
         /exportfile=<path to write the output file to>
+        
+        /productname=<product name>
+        
+            This will force the output to output the string <product name>
+            instead of the computed name from the SQL results. This is useful
+            if you want to group many unwanted components into a product for
+            example.
+        
+        /dictionnary=<path to dictionnary file>
+        
+            The provided dictionnary file will be used instead of the default
+            file (if found in both cases).
 
         /corpname=<company name>
         
@@ -125,11 +147,10 @@ EXPORT function:
             
             The Software Product is created with the Component name as-is.
 
-IMPORT and CREATION:
+IMPORT commands:
 
-    Phase 2 of the automated product creation requires an input.csv file to be
-    placed in the running folder following the csv schema provided during the 
-    export phase.
+    Phase 2 of the tool requires an input.csv file to be placed in the running
+    folder following the csv schema provided during the export phase.
     
     The following command line is required for the import process to start:
     
@@ -155,6 +176,13 @@ IMPORT and CREATION:
         
             Run the import / creation process for up to 10 components / 
             products and exits.
+
+        /productname=<product name>
+        
+            This will force the import processto use string <product name>
+            instead of the name from the CSV file. This is useful if you want
+            to group many unwanted components into a product for example.
+
 ";
         #endregion
 
