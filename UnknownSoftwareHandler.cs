@@ -15,6 +15,7 @@ namespace Symantec.CWoC {
 	class SoftwareImporter {	
 		public static readonly string VERSION = @"0.6";
 		private static bool DEBUG = false;
+		private static List<string> dictionnary = new List<string> ();
 
         #region public static readonly string HELP_MSG
         public static readonly string HELP_MSG = @"
@@ -45,9 +46,8 @@ EXPORT function:
 
         /corpname=<company name>
         
-            Match this string with the Company Name associated with the 
-            software component to be exported. Note that this is an equality
-            match.
+            Match this string with the Company Name assocated with the software
+            component to be exported. Note that this is an equality match.
 
         /corpfilter=<sql like filter>
         
@@ -57,12 +57,12 @@ EXPORT function:
         
         /nullcorp
         
-            Export components from which a company does not exist yet.
+            Export components fro which a company does not exist yet.
         
         /nullcorp=<catchall company name>
         
-            Export components from which a company does not exist yet and set 
-            it to <catchall company name> in the output file.
+            Export components fro which a company does not exist yet and set it
+            to >catchall company name> in the output file.
         
         /componentfilter=<sql like filter>
 
@@ -198,13 +198,24 @@ IMPORT and CREATION:
 					conf.export_path = @"output.csv";
 				}
 				StreamWriter writer = new StreamWriter(conf.export_path, false, Encoding.UTF8);
+				
+				if (File.Exists("dictionnary.txt")) {
+					using (StreamReader sr = new StreamReader("dictionnary.txt")) {
+						while (sr.Peek() >= 0) {
+							string s = sr.ReadLine();
+							if (s.Length > 0 && s != "") {
+								dictionnary.Add(s);
+							}
+						}
+					}
+				}
 
 				// Write the CSV file header for clarity
 				WriteCSVOutput(CSV_HEAD, writer);
 				
 				// Output each line with the computed product name and filter strings
 				foreach (DataRow r in unknown_components.Rows) {
-					compute_product_data c = new compute_product_data(r, conf.versioning_mode);
+					compute_product_data c = new compute_product_data(r, conf.versioning_mode, dictionnary);
 
 					if (c.component_company == "") {
 						c.component_company = conf.nullcorp_name;
@@ -314,6 +325,12 @@ IMPORT and CREATION:
 			}
 		}
 
+		public static string sanatize_sql_filters(string filter) {
+			filter = filter.Replace("'", "");
+			filter = filter.Replace("GO;", ";");
+			return filter;
+		}
+
 		public class compute_product_data {
 			public string product_name;
 			public string product_description;
@@ -327,12 +344,55 @@ IMPORT and CREATION:
 			public string component_minor;
 			public string component_version;
 			
+			private List<string> dictionnary;
+
+			public compute_product_data(DataRow r, Versioning version_mode, List<string> dictionnary) {
+				get_product_data(r, version_mode, dictionnary);
+			}
+		
 			public compute_product_data(DataRow r, Versioning version_mode) {
-				
+				List<string> dictionnary = new List<string>();
+				dictionnary.Add("64-bit;");
+				dictionnary.Add("64-Bit;");
+				dictionnary.Add("64-BIt;");
+				dictionnary.Add("64-BIT;");
+				dictionnary.Add("64-bIT;");
+				dictionnary.Add("64-biT;");
+				dictionnary.Add("32-bit;");
+				dictionnary.Add("32-Bit;");
+				dictionnary.Add("32-BIt;");
+				dictionnary.Add("32-BIT;");
+				dictionnary.Add("32-bIT;");
+				dictionnary.Add("32-biT;");
+				dictionnary.Add("64 bit;");
+				dictionnary.Add("64 Bit;");
+				dictionnary.Add("64 BIt;");
+				dictionnary.Add("64 BIT;");
+				dictionnary.Add("64 bIT;");
+				dictionnary.Add("64 biT;");
+				dictionnary.Add("32 bit;");
+				dictionnary.Add("32 Bit;");
+				dictionnary.Add("32 BIt;");
+				dictionnary.Add("32 BIT;");
+				dictionnary.Add("32 bIT;");
+				dictionnary.Add("32 biT;");
+				dictionnary.Add("x86");
+				dictionnary.Add("X86");
+				dictionnary.Add("x64");
+				dictionnary.Add("X64");
+				dictionnary.Add("English");
+				dictionnary.Add("MUI");
+				dictionnary.Add("()");
+				get_product_data(r, version_mode, dictionnary);
+			}
+
+			private void get_product_data(DataRow r, Versioning version_mode, List<string> dictionnary){
 				product_name = "";
 				product_filter = "";
 				product_description = "";
 				product_version = "";
+				
+				this.dictionnary = dictionnary;
 				
 				component_name    = r[0].ToString().Replace("\r\n", "");
 				component_guid    = r[1].ToString();
@@ -344,32 +404,32 @@ IMPORT and CREATION:
 				if (version_mode == Versioning.None) {	
 					if (component_version.Length > 0) {
 						// If a version exist we try to remove it from the component name (-> product name)
-						product_name = component_name.Replace(component_version, "");
+						product_name = clean_product_name(component_name.Replace(component_version, ""));
 					} else {
 						// If not we use the component name as is
-						product_name = component_name.Trim();
+						product_name = clean_product_name(component_name.Trim());
 					}
 					// Create the product filter based on generated product name (because it doesn't have version)
-					product_filter = product_name.Replace(" ", "+").Trim("+ ".ToCharArray());
+					product_filter = product_name;
 					product_version = "";
 				}
 				
 				if (version_mode == Versioning.Major) {
 					if (component_major.Length > 0 && component_version.Length > 0) {
 						// If major version and version exist we can replace accordingly
-						product_name = component_name.Replace(component_version, component_major);
-						product_filter = component_name.Replace(component_version, "").Replace(" ", "+").Trim("+ ".ToCharArray());						
+						product_name = clean_product_name(component_name.Replace(component_version, component_major));
+						product_filter = product_name;
 						product_version = component_major;
 					} else if (component_major.Length == 0 && component_version.Length > 0){
 						// If not we try to remove the version altogether (because we cannot define with major)
-						product_name = component_name.Replace(component_version, "");
-						product_filter = product_name.Replace(" ", "+").Trim("+ ".ToCharArray());
+						product_name = clean_product_name(component_name.Replace(component_version, ""));
+						product_filter = product_name;
 						// Product version doesn't matter in this case -> it's in the prod name
 						product_version = "";
 					} else {
 						// In all other case we can't do much - just trim!
-						product_name = component_name.Trim();
-						product_filter = product_name.Replace(" ", "+").Trim("+ ".ToCharArray());
+						product_name = clean_product_name(component_name.Trim());
+						product_filter = product_name;
 						product_version = "";
 					}
 				}
@@ -377,32 +437,50 @@ IMPORT and CREATION:
 				if (version_mode == Versioning.Major_Minor) {
 					if (component_major.Length > 0 && component_minor.Length > 0 && component_version.Length > 0) {
 						// If major and minor version and version exist we can replace accordingly
-						product_name = component_name.Replace(component_version, component_major + "." + component_minor);
-						product_filter = component_name.Replace(component_version, "").Replace(" ", "+").Trim("+ ".ToCharArray());
+						product_name = clean_product_name(component_name.Replace(component_version, component_major + "." + component_minor));
+						product_filter = product_name;
 						product_version = component_major + "." + component_minor;
 					} else if ((component_major.Length == 0 || component_minor.Length == 0) && component_version.Length > 0){
 						// If not we try to remove the version altogether (because we cannot define without major)
-						product_name = component_name.Replace(component_version, "");
-						product_filter = product_name.Replace(" ", "+").Trim("+ ".ToCharArray());
+						product_name = clean_product_name(component_name.Replace(component_version, ""));
+						product_filter = product_name;
 						product_version = "";
 					} else {
 						// In all other case we can't do much - just trim!
-						product_filter = product_name.Replace(" ", "+").Trim("+ ".ToCharArray());
+						product_name = clean_product_name(component_name);
+						product_filter = product_name;
 						product_version = "";
 					}
 				}
 
 				if (version_mode == Versioning.Exact) {
-					product_name = component_name;
+					product_name = clean_product_name(component_name);
 					if (component_version.Length > 0) {
-						product_filter = product_name.Replace(" ", "+").Trim("+ ".ToCharArray());
+						product_filter = product_name;
 					}
 					product_version = component_version;
 				}
-
+			}
+	
+			private string clean_product_name(string product_name, List<string> dictionnary) {
+				dictionnary.ForEach (delegate (string entry) {
+					// Replace full string with leading and trailing white space
+					product_name = product_name.Replace(" " + entry + " ", " ");
+					// Replace full string with leading white space
+					product_name = product_name.Replace(entry + " ", " ");
+					// Replace full string with trailing white space
+					product_name = product_name.Replace(entry + " ", " ");
+					// Remove the string if still found
+					product_name = product_name.Replace(entry, "");
+				});
+				return product_name.Trim(" /-".ToCharArray());				
+			}
+			
+			private string clean_product_name(string product_name) {
+				return clean_product_name(product_name, this.dictionnary);
 			}
 		}
-
+		
 		public static void WriteCSVOutput(string line, StreamWriter writer) {
 			writer.WriteLine(line);
 		}
@@ -447,9 +525,9 @@ IMPORT and CREATION:
 				} else if (arg.StartsWith("/corpname=")) {
 					conf.company_name = arg.Substring("/corpname=".Length);
 				} else if (arg.StartsWith("/corpfilter=")) {
-					conf.company_filter = arg.Substring("/corpfilter=".Length);
+					conf.company_filter = sanatize_sql_filters(arg.Substring("/corpfilter=".Length));
 				} else if (arg.StartsWith("/componentfilter=")) {
-					conf.component_filter = arg.Substring("/componentfilter=".Length);
+					conf.component_filter = sanatize_sql_filters(arg.Substring("/componentfilter=".Length));
 				} else if (arg=="/nullcorp") {
 					conf.nullcorp_allowed = true;
 				} else if (arg.StartsWith("/nullcorp=")) {
