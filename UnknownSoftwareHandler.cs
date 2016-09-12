@@ -15,7 +15,6 @@ namespace Symantec.CWoC {
 	class SoftwareImporter {	
 		public static readonly string VERSION = @"0.6";
 		private static bool DEBUG = false;
-		private static List<string> dictionnary = new List<string> ();
 
         #region public static readonly string HELP_MSG
         public static readonly string HELP_MSG = @"
@@ -172,6 +171,18 @@ IMPORT and CREATION:
 			if (conf.display_help) {
 				Console.WriteLine(HELP_MSG);
 				return 0;
+			} else if (conf.create_dictionnary) {
+				try {
+					if (!File.Exists("dictionnary.txt")) {
+						StreamWriter writer = new StreamWriter("dictionnary.txt", false, Encoding.UTF8);
+						ProductDictionnary.LoadPreset();
+						ProductDictionnary.Data.ForEach(delegate (string word) { writer.WriteLine(word);});
+						writer.Close();
+					}
+				} catch {
+					Console.WriteLine("Failed to create the dictonnary.txt file. Make sure the file doesn't exist and is not opened by a tool holding a lock to it like Notepad++");
+				}
+				return 0;
 			}
 			
 			if (!SecurityTrusteeManager.IsUserLocalAdmin()) {
@@ -199,23 +210,15 @@ IMPORT and CREATION:
 				}
 				StreamWriter writer = new StreamWriter(conf.export_path, false, Encoding.UTF8);
 				
-				if (File.Exists("dictionnary.txt")) {
-					using (StreamReader sr = new StreamReader("dictionnary.txt")) {
-						while (sr.Peek() >= 0) {
-							string s = sr.ReadLine();
-							if (s.Length > 0 && s != "") {
-								dictionnary.Add(s);
-							}
-						}
-					}
-				}
+				ProductDictionnary.Load(conf.product_dictionnary);
+				string prodname = "";
 
 				// Write the CSV file header for clarity
-				WriteCSVOutput(CSV_HEAD, writer);
+				writer.WriteLine(CSV_HEAD);
 				
 				// Output each line with the computed product name and filter strings
 				foreach (DataRow r in unknown_components.Rows) {
-					compute_product_data c = new compute_product_data(r, conf.versioning_mode, dictionnary);
+					compute_product_data c = new compute_product_data(r, conf.versioning_mode);
 
 					if (c.component_company == "") {
 						c.component_company = conf.nullcorp_name;
@@ -224,17 +227,23 @@ IMPORT and CREATION:
 						}
 					}
 
-					WriteCSVOutput(
+					if (conf.product_name != "" && conf.product_name.Length != 0) {
+						prodname = conf.product_name;
+					} else {
+						prodname = c.product_name;
+					}
+
+					
+					writer.WriteLine(
 						"\"" + c.component_name + "\"\t" +
-						"\"" + c.product_name + "\"\t" +
+						"\"" + prodname + "\"\t" +
 						"\"" + c.product_filter + "\"\t" +
 						"\"" + c.product_version + "\"\t" +
 						"\"" + c.component_company + "\"\t" +
 						"\"" + c.component_major + "\"\t" +
 						"\"" + c.component_minor + "\"\t" +
 						"\"" + c.component_version + "\"\t" +
-						"\"" + c.component_guid + "\"",
-						writer			
+						"\"" + c.component_guid + "\""
 					);
 				}
 			
@@ -248,6 +257,7 @@ IMPORT and CREATION:
 				int i = 0;
 				DateTime t = DateTime.Now;
 				string description = "";
+				string prodname = "";
 				
 				if (File.Exists(path)) {
 					using (StreamReader sr = new StreamReader(path)) {
@@ -258,9 +268,15 @@ IMPORT and CREATION:
 							}
 							i++;
 							description = String.Format("Created by UnknownSoftwareHandler.exe on {0}, entry id in batch={1}", t.ToString(), i.ToString());
+							
+							if (conf.product_name != "" && conf.product_name.Length == 0) {
+								prodname = conf.product_name;
+							} else {
+								prodname = in_data[1];
+							}
 							if (conf.dryrun) {
 								Console.WriteLine("\n\tProduct\t{0}\n\tDescr.\t{1}\n\tFilter\t{2}\n\tVersion\t{3}\n\tCompany\t{5}\n\tGuid\t{4}\n"
-									, in_data[1].Replace("\"", "")	// Product
+									, prodname.Replace("\"", "")	// Product
 									, description					// Description
 									, in_data[2].Replace("\"", "")	// Filter
 									, in_data[3].Replace("\"", "")  // Version
@@ -344,56 +360,16 @@ IMPORT and CREATION:
 			public string component_minor;
 			public string component_version;
 			
-			private List<string> dictionnary;
-
-			public compute_product_data(DataRow r, Versioning version_mode, List<string> dictionnary) {
-				get_product_data(r, version_mode, dictionnary);
-			}
-		
 			public compute_product_data(DataRow r, Versioning version_mode) {
-				List<string> dictionnary = new List<string>();
-				dictionnary.Add("64-bit;");
-				dictionnary.Add("64-Bit;");
-				dictionnary.Add("64-BIt;");
-				dictionnary.Add("64-BIT;");
-				dictionnary.Add("64-bIT;");
-				dictionnary.Add("64-biT;");
-				dictionnary.Add("32-bit;");
-				dictionnary.Add("32-Bit;");
-				dictionnary.Add("32-BIt;");
-				dictionnary.Add("32-BIT;");
-				dictionnary.Add("32-bIT;");
-				dictionnary.Add("32-biT;");
-				dictionnary.Add("64 bit;");
-				dictionnary.Add("64 Bit;");
-				dictionnary.Add("64 BIt;");
-				dictionnary.Add("64 BIT;");
-				dictionnary.Add("64 bIT;");
-				dictionnary.Add("64 biT;");
-				dictionnary.Add("32 bit;");
-				dictionnary.Add("32 Bit;");
-				dictionnary.Add("32 BIt;");
-				dictionnary.Add("32 BIT;");
-				dictionnary.Add("32 bIT;");
-				dictionnary.Add("32 biT;");
-				dictionnary.Add("x86");
-				dictionnary.Add("X86");
-				dictionnary.Add("x64");
-				dictionnary.Add("X64");
-				dictionnary.Add("English");
-				dictionnary.Add("MUI");
-				dictionnary.Add("()");
-				get_product_data(r, version_mode, dictionnary);
+				get_product_data(r, version_mode);
 			}
 
-			private void get_product_data(DataRow r, Versioning version_mode, List<string> dictionnary){
+			private void get_product_data(DataRow r, Versioning version_mode){
 				product_name = "";
 				product_filter = "";
 				product_description = "";
 				product_version = "";
-				
-				this.dictionnary = dictionnary;
-				
+								
 				component_name    = r[0].ToString().Replace("\r\n", "");
 				component_guid    = r[1].ToString();
 				component_company = r[2].ToString().Replace("\r\n", "");
@@ -462,8 +438,8 @@ IMPORT and CREATION:
 				}
 			}
 	
-			private string clean_product_name(string product_name, List<string> dictionnary) {
-				dictionnary.ForEach (delegate (string entry) {
+			private string clean_product_name(string product_name) {
+				ProductDictionnary.Data.ForEach (delegate (string entry) {
 					// Replace full string with leading and trailing white space
 					product_name = product_name.Replace(" " + entry + " ", " ");
 					// Replace full string with leading white space
@@ -475,14 +451,62 @@ IMPORT and CREATION:
 				});
 				return product_name.Trim(" /-".ToCharArray());				
 			}
-			
-			private string clean_product_name(string product_name) {
-				return clean_product_name(product_name, this.dictionnary);
-			}
 		}
-		
-		public static void WriteCSVOutput(string line, StreamWriter writer) {
-			writer.WriteLine(line);
+
+		public static class ProductDictionnary {
+			public static List<string> Data = new List<string> ();
+			public static void Load(string path) {
+				Data.Clear();
+				try {
+					if (File.Exists(path)) {
+						using (StreamReader sr = new StreamReader(path)) {
+							while (sr.Peek() >= 0) {
+								string s = sr.ReadLine();
+								if (s.Length > 0 && s != "") {
+									ProductDictionnary.Data.Add(s);
+								}
+							}
+						}
+					}
+				} catch {
+					LoadPreset();
+				}
+			}
+			
+			public static void LoadPreset() {
+				Data.Clear();
+				Data.Add("64-bit;");
+				Data.Add("64-Bit;");
+				Data.Add("64-BIt;");
+				Data.Add("64-BIT;");
+				Data.Add("64-bIT;");
+				Data.Add("64-biT;");
+				Data.Add("32-bit;");
+				Data.Add("32-Bit;");
+				Data.Add("32-BIt;");
+				Data.Add("32-BIT;");
+				Data.Add("32-bIT;");
+				Data.Add("32-biT;");
+				Data.Add("64 bit;");
+				Data.Add("64 Bit;");
+				Data.Add("64 BIt;");
+				Data.Add("64 BIT;");
+				Data.Add("64 bIT;");
+				Data.Add("64 biT;");
+				Data.Add("32 bit;");
+				Data.Add("32 Bit;");
+				Data.Add("32 BIt;");
+				Data.Add("32 BIT;");
+				Data.Add("32 bIT;");
+				Data.Add("32 biT;");
+				Data.Add("x86");
+				Data.Add("X86");
+				Data.Add("x64");
+				Data.Add("X64");
+				Data.Add("English");
+				Data.Add("MUI");
+				Data.Add("()");
+			}
 		}
 		
 		public static string GetProductNameFilter(string name_filter) {
@@ -517,6 +541,12 @@ IMPORT and CREATION:
 				} else if (arg =="/export") {
 					conf.export_mode = true;
 					conf.display_help = false;
+				} else if (arg.StartsWith("/productname=")) {
+					conf.product_name = arg.Substring("/productname=".Length);
+				} else if (arg.StartsWith("/dictionnary=")) {
+					conf.product_dictionnary = arg.Substring("/dictionnary=".Length);
+				} else if (arg == "/createdictionnary") {
+					conf.create_dictionnary = true;
 				} else if (arg.StartsWith("/importfile=")) {
 					conf.import_path = arg.Substring("/importfile=".Length);
 				} else if (arg.StartsWith("/exportfile=")) {
@@ -555,12 +585,6 @@ IMPORT and CREATION:
 			} else if (conf.company_filter =="" && conf.company_name == "" && conf.nullcorp_allowed == true) {
 				conf.company_filter = "";
 			}
-
-/*
-	/nullcorp		
-	/nullcorp=<catchall company name>
-*/
-
 			
 			return conf;
 		}
@@ -573,6 +597,11 @@ IMPORT and CREATION:
 		
 		public string import_path;
 		public string export_path;
+		
+		public string product_name;
+		public string product_dictionnary;
+		
+		public bool create_dictionnary;
 		
 		public string company_name;
 		public string company_filter;
@@ -594,6 +623,10 @@ IMPORT and CREATION:
 			
 			import_path = "input.csv";
 			export_path = "output.csv";
+			
+			product_name = "";
+			product_dictionnary="dictionnary.txt";
+			create_dictionnary = false;
 
 			company_name = "";
 			company_filter = "";
