@@ -231,6 +231,10 @@ IMPORT commands:
 				}
 
 				DataTable unknown_components = DatabaseAPI.GetTable(unk_sql);
+				if (unknown_components.Rows.Count == 0) {
+					// Nothing to do here - move on :D.
+					return 0;
+				}
 
 				// Open the output file for writing as UTF-8
 				if (File.Exists(conf.export_path) == false) {
@@ -398,12 +402,12 @@ IMPORT commands:
 				product_description = "";
 				product_version = "";
 								
-				component_name    = r[0].ToString().Replace("\r\n", "");
+				component_name    = r[0].ToString().Replace("\r\n", " ");
 				component_guid    = r[1].ToString();
-				component_company = r[2].ToString().Replace("\r\n", "");
-				component_major   = r[3].ToString().Replace("\r\n", "");
-				component_minor   = r[4].ToString().Replace("\r\n", "");
-				component_version = r[5].ToString().Replace("\r\n", "");
+				component_company = r[2].ToString().Replace("\r\n", " ");
+				component_major   = r[3].ToString().Replace("\r\n", " ");
+				component_minor   = r[4].ToString().Replace("\r\n", " ");
+				component_version = r[5].ToString().Replace("\r\n", " ");
 				
 				if (version_mode == Versioning.None) {	
 					if (component_version.Length > 0) {
@@ -414,7 +418,7 @@ IMPORT commands:
 						product_name = clean_product_name(component_name.Trim());
 					}
 					// Create the product filter based on generated product name (because it doesn't have version)
-					product_filter = product_name;
+					product_filter = product_name.Replace(" ", "+").Replace("++", "+");
 					product_version = "";
 				}
 				
@@ -422,18 +426,18 @@ IMPORT commands:
 					if (component_major.Length > 0 && component_version.Length > 0) {
 						// If major version and version exist we can replace accordingly
 						product_name = clean_product_name(component_name.Replace(component_version, component_major));
-						product_filter = product_name;
+						product_filter = clean_product_name(component_name.Replace(component_version, "")).Replace(" ", "+").Replace("++", "+");
 						product_version = component_major;
 					} else if (component_major.Length == 0 && component_version.Length > 0){
 						// If not we try to remove the version altogether (because we cannot define with major)
 						product_name = clean_product_name(component_name.Replace(component_version, ""));
-						product_filter = product_name;
+						product_filter = product_name.Replace(" ", "+").Replace("++", "+");
 						// Product version doesn't matter in this case -> it's in the prod name
 						product_version = "";
 					} else {
 						// In all other case we can't do much - just trim!
 						product_name = clean_product_name(component_name.Trim());
-						product_filter = product_name;
+						product_filter = product_name.Replace(" ", "+").Replace("++", "+");
 						product_version = "";
 					}
 				}
@@ -442,17 +446,17 @@ IMPORT commands:
 					if (component_major.Length > 0 && component_minor.Length > 0 && component_version.Length > 0) {
 						// If major and minor version and version exist we can replace accordingly
 						product_name = clean_product_name(component_name.Replace(component_version, component_major + "." + component_minor));
-						product_filter = product_name;
+						product_filter = clean_product_name(component_name.Replace(component_version, "")).Replace(" ", "+").Replace("++", "+");
 						product_version = component_major + "." + component_minor;
 					} else if ((component_major.Length == 0 || component_minor.Length == 0) && component_version.Length > 0){
 						// If not we try to remove the version altogether (because we cannot define without major)
 						product_name = clean_product_name(component_name.Replace(component_version, ""));
-						product_filter = product_name;
+						product_filter = product_name.Replace(" ", "+").Replace("++", "+");
 						product_version = "";
 					} else {
 						// In all other case we can't do much - just trim!
 						product_name = clean_product_name(component_name);
-						product_filter = product_name;
+						product_filter = product_name.Replace(" ", "+").Replace("++", "+");
 						product_version = "";
 					}
 				}
@@ -460,7 +464,7 @@ IMPORT commands:
 				if (version_mode == Versioning.Exact) {
 					product_name = clean_product_name(component_name);
 					if (component_version.Length > 0) {
-						product_filter = product_name;
+						product_filter = clean_product_name(component_name.Replace(component_version, "")).Replace(" ", "+").Replace("++", "+");
 					}
 					product_version = component_version;
 				}
@@ -657,7 +661,7 @@ IMPORT commands:
 			create_dictionnary = false;
 
 			company_name = "";
-			company_filter = "";
+			company_filter = "Zzzzzz..Zzzzzz..Zzzzzz..";
 			
 			nullcorp_allowed = false;
 			nullcorp_name = "";
