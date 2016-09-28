@@ -661,7 +661,7 @@ IMPORT commands:
 			create_dictionnary = false;
 
 			company_name = "";
-			company_filter = "Zzzzzz..Zzzzzz..Zzzzzz..";
+			company_filter = "";
 			
 			nullcorp_allowed = false;
 			nullcorp_name = "";
