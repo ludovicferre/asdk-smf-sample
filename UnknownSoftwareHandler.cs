@@ -13,7 +13,7 @@ using Altiris.NS.Security;
 
 namespace Symantec.CWoC {
 	class SoftwareImporter {	
-		public static readonly string VERSION = @"0.7";
+		public static readonly string VERSION = @"0.9";
 		private static bool DEBUG = false;
 
         #region public static readonly string HELP_MSG
@@ -179,7 +179,7 @@ IMPORT commands:
 
         /productname=<product name>
         
-            This will force the import processto use string <product name>
+            This will force the import process to use string <product name>
             instead of the name from the CSV file. This is useful if you want
             to group many unwanted components into a product for example.
 
@@ -191,6 +191,7 @@ IMPORT commands:
 		public static int Main(string [] Args) {
 
 			CLIConfig conf = GetCLIConfig(Args);
+			DEBUG = conf.debug;
 			
 			if (DEBUG) {
 				conf.PrintConfig();
@@ -255,7 +256,7 @@ IMPORT commands:
 					if (c.component_company == "") {
 						c.component_company = conf.nullcorp_name;
 						if (DEBUG) {
-							//Console.WriteLine("Found a component company empty - replacing with {0}.", conf.nullcorp_name);
+							Console.WriteLine("Found a component company empty - replacing with {0}.", conf.nullcorp_name);
 						}
 					}
 
@@ -267,15 +268,15 @@ IMPORT commands:
 
 					
 					writer.WriteLine(
-						"\"" + c.component_name + "\"\t" +
-						"\"" + prodname + "\"\t" +
-						"\"" + c.product_filter + "\"\t" +
-						"\"" + c.product_version + "\"\t" +
-						"\"" + c.component_company + "\"\t" +
-						"\"" + c.component_major + "\"\t" +
-						"\"" + c.component_minor + "\"\t" +
-						"\"" + c.component_version + "\"\t" +
-						"\"" + c.component_guid + "\""
+						"\"" + c.component_name.Replace("'", " ") + "\"\t" +
+						"\"" + prodname.Replace("'", " ") + "\"\t" +
+						"\"" + c.product_filter.Replace("'", " ") + "\"\t" +
+						"\"" + c.product_version.Replace("'", " ") + "\"\t" +
+						"\"" + c.component_company.Replace("'", " ") + "\"\t" +
+						"\"" + c.component_major.Replace("'", " ") + "\"\t" +
+						"\"" + c.component_minor.Replace("'", " ") + "\"\t" +
+						"\"" + c.component_version.Replace("'", " ") + "\"\t" +
+						"\"" + c.component_guid.Replace("'", " ") + "\""
 					);
 				}
 			
@@ -308,12 +309,12 @@ IMPORT commands:
 							}
 							if (conf.dryrun) {
 								Console.WriteLine("\n\tProduct\t{0}\n\tDescr.\t{1}\n\tFilter\t{2}\n\tVersion\t{3}\n\tCompany\t{5}\n\tGuid\t{4}\n"
-									, prodname.Replace("\"", "")	// Product
+									, prodname.Replace("\"", "").Replace("'", "")	// Product
 									, description					// Description
-									, in_data[2].Replace("\"", "")	// Filter
-									, in_data[3].Replace("\"", "")  // Version
-									, in_data[8].Replace("\"", "")	// Guid
-									, in_data[4].Replace("\"", "")	// Company
+									, in_data[2].Replace("\"", "").Replace("'", " ")	// Filter
+									, in_data[3].Replace("\"", "").Replace("'", " ")  // Version
+									, in_data[8].Replace("\"", "").Replace("'", " ")	// Guid
+									, in_data[4].Replace("\"", "").Replace("'", " ")	// Company
 								);
 								continue;
 							}
@@ -321,12 +322,12 @@ IMPORT commands:
 								break;
 							}
 							create_software_product(
-								  in_data[1].Replace("\"", "")	// Product
+								  in_data[1].Replace("\"", "").Replace("'", " ")	// Product
 								, description					// Description
-								, in_data[2].Replace("\"", "")	// Filter
-								, in_data[3].Replace("\"", "")  // Version
-								, in_data[8].Replace("\"", "")	// Guid
-								, in_data[4].Replace("\"", "")	// Company
+								, in_data[2].Replace("\"", "").Replace("'", " ")	// Filter
+								, in_data[3].Replace("\"", "").Replace("'", " ")  // Version
+								, in_data[8].Replace("\"", "").Replace("'", " ")	// Guid
+								, in_data[4].Replace("\"", "").Replace("'", " ")	// Company
 							);
 						}
 					}
@@ -347,19 +348,30 @@ IMPORT commands:
 			Console.WriteLine("Product guid = {0}", productDetails.Guid.ToString());
 
 			string sql_manage_product = String.Format(sql.set_product_managed, productDetails.Guid);
+			if (DEBUG) {
+				Console.WriteLine("Running SQL statement:\n{0}", sql_manage_product);
+			}
 			DatabaseAPI.ExecuteNonQuery(sql_manage_product);
 
             string sql_mark_component_managed = String.Format("update Inv_Software_Component_State set IsManaged = 1 where _ResourceGuid = '{0}'", guid);
+			if (DEBUG) {
+				Console.WriteLine("Running SQL statement:\n{0}", sql_mark_component_managed);
+			}
             DatabaseAPI.ExecuteNonQuery(sql_mark_component_managed);
 
 
 			// Associate Software Component if needed
 			string sql_associate_component = String.Format(sql.associate_component, guid, productDetails.Guid.ToString());
-			// Console.WriteLine("\n" + sql_associate_component + "\n");
+			if (DEBUG) {
+				Console.WriteLine("Running SQL statement:\n{0}", sql_associate_component);
+			}
 			DatabaseAPI.ExecuteNonQuery(sql_associate_component);
 			
 			if (version != "") {
 				string sql_insert_version = String.Format(sql.ins_product_version, productDetails.Guid, version);
+				if (DEBUG) {
+					Console.WriteLine("Running SQL statement:\n{0}", sql_insert_version);
+				}
 				DatabaseAPI.ExecuteNonQuery(sql_insert_version);
 			}
 			
@@ -368,7 +380,10 @@ IMPORT commands:
 				
 				string sql_filter = String.Format(sql.product_filter_query, filter, company, version);
 				string sql_insert_filter = String.Format(sql.ins_product_filter, productDetails.Guid, filter, company, version, sql_filter);
-				
+				if (DEBUG) {
+					Console.WriteLine("Running SQL statement:\n{0}", sql_insert_filter);
+				}
+
 				DatabaseAPI.ExecuteNonQuery(sql_insert_filter);
 			}
 		}
@@ -562,6 +577,8 @@ IMPORT commands:
 					conf.dryrun = true;
 					conf.testrun = false;
 					conf.export_mode = false;
+				} else if (arg == "/debug") {
+					conf.debug = true;
 				} else if (arg == "/testrun") {
 					conf.testrun = true;
 					conf.dryrun = false;
@@ -627,6 +644,8 @@ IMPORT commands:
 		public bool display_help;
 		public bool export_mode;
 		
+		public bool debug;
+		
 		public string import_path;
 		public string export_path;
 		
@@ -652,6 +671,8 @@ IMPORT commands:
 			// Initialise the config properties
 			display_help = true;
 			export_mode = true;
+			
+			debug = false;
 			
 			import_path = "input.csv";
 			export_path = "output.csv";
