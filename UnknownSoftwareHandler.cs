@@ -13,7 +13,7 @@ using Altiris.NS.Security;
 
 namespace Symantec.CWoC {
 	class SoftwareImporter {	
-		public static readonly string VERSION = @"1.0";
+		public static readonly string VERSION = @"1.1";
 		private static bool DEBUG = false;
 
         #region public static readonly string HELP_MSG
@@ -295,42 +295,51 @@ IMPORT commands:
 				if (File.Exists(path)) {
 					using (StreamReader sr = new StreamReader(path)) {
 						while (sr.Peek() >= 0) {
-							in_data = sr.ReadLine().Split("\t".ToCharArray());
-							if (in_data[0] == "\"component_name\"") {
-								continue;
-							}
-							i++;
-							description = String.Format("Created by UnknownSoftwareHandler.exe on {0}, entry id in batch={1}", t.ToString(), i.ToString());
-							
-							if (conf.product_name != "" && conf.product_name.Length == 0) {
-								prodname = conf.product_name;
-							} else {
-								prodname = in_data[1];
-							}
-							if (conf.dryrun || DEBUG) {
-								Console.WriteLine("\n\tProduct: {0}\n\tDescr.:  {1}\n\tFilter:  {2}\n\tVersion: {3}\n\tCompany: {5}\n\tGuid:    {4}\n"
-									, prodname.Replace("\"", "").Replace("'", "")		// Product
+							string line = sr.ReadLine();
+							try {
+								in_data = line.Split("\t".ToCharArray());
+								if(DEBUG) {
+									Console.WriteLine(line);
+								}
+								if (in_data[0] == "\"component_name\"") {
+									continue;
+								}
+								i++;
+								description = String.Format("Created by UnknownSoftwareHandler.exe on {0}, entry id in batch={1}", t.ToString(), i.ToString());
+								
+								if (conf.product_name != "" && conf.product_name.Length == 0) {
+									prodname = conf.product_name;
+								} else {
+									prodname = in_data[1];
+								}
+								if (conf.dryrun || DEBUG) {
+									Console.WriteLine("\n\tProduct: {0}\n\tDescr.:  {1}\n\tFilter:  {2}\n\tVersion: {3}\n\tCompany: {5}\n\tGuid:    {4}\n"
+										, prodname.Replace("\"", "").Replace("'", "")		// Product
+										, description										// Description
+										, in_data[2].Replace("\"", "").Replace("'", " ")	// Filter
+										, in_data[3].Replace("\"", "").Replace("'", " ")  	// Version
+										, in_data[8].Replace("\"", "").Replace("'", " ")	// Guid
+										, in_data[4].Replace("\"", "").Replace("'", " ")	// Company
+									);
+									if (!DEBUG) {
+										continue;
+									}
+								}
+								if (conf.testrun && i > 10) {
+									break;
+								}
+								create_software_product(
+									  in_data[1].Replace("\"", "").Replace("'", " ")	// Product
 									, description										// Description
 									, in_data[2].Replace("\"", "").Replace("'", " ")	// Filter
 									, in_data[3].Replace("\"", "").Replace("'", " ")  	// Version
 									, in_data[8].Replace("\"", "").Replace("'", " ")	// Guid
 									, in_data[4].Replace("\"", "").Replace("'", " ")	// Company
 								);
-								if (!DEBUG) {
-									continue;
-								}
+							} catch (Exception e) {
+								Console.WriteLine("Error processing line {0}...", line);
+								Console.WriteLine("Error: {0}\nSource: {1}\nDetails: {2}", e.Message, e.Source, e.InnerException);
 							}
-							if (conf.testrun && i > 10) {
-								break;
-							}
-							create_software_product(
-								  in_data[1].Replace("\"", "").Replace("'", " ")	// Product
-								, description										// Description
-								, in_data[2].Replace("\"", "").Replace("'", " ")	// Filter
-								, in_data[3].Replace("\"", "").Replace("'", " ")  	// Version
-								, in_data[8].Replace("\"", "").Replace("'", " ")	// Guid
-								, in_data[4].Replace("\"", "").Replace("'", " ")	// Company
-							);
 						}
 					}
 				return 0;
@@ -343,10 +352,6 @@ IMPORT commands:
 
 		public static void create_software_product(string product, string description, string filter, string version, string guid, string company) {
 			SoftwareProductManagementLib managementLib = new SoftwareProductManagementLib();
-			if (product == String.Empty || product == "" || product.Length == 0) {
-				Console.WriteLine("Skipping line with no product name...");
-				return;
-			}
 			SoftwareProductDetails productDetails = managementLib.CreateSoftwareProduct(product, description, company);
 
 			Console.WriteLine("Company guid = {0}.", productDetails.CompanyGuid.ToString());
