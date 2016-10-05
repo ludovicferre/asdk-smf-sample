@@ -13,7 +13,7 @@ using Altiris.NS.Security;
 
 namespace Symantec.CWoC {
 	class SoftwareImporter {	
-		public static readonly string VERSION = @"0.9";
+		public static readonly string VERSION = @"1.0";
 		private static bool DEBUG = false;
 
         #region public static readonly string HELP_MSG
@@ -307,25 +307,27 @@ IMPORT commands:
 							} else {
 								prodname = in_data[1];
 							}
-							if (conf.dryrun) {
-								Console.WriteLine("\n\tProduct\t{0}\n\tDescr.\t{1}\n\tFilter\t{2}\n\tVersion\t{3}\n\tCompany\t{5}\n\tGuid\t{4}\n"
-									, prodname.Replace("\"", "").Replace("'", "")	// Product
-									, description					// Description
+							if (conf.dryrun || DEBUG) {
+								Console.WriteLine("\n\tProduct: {0}\n\tDescr.:  {1}\n\tFilter:  {2}\n\tVersion: {3}\n\tCompany: {5}\n\tGuid:    {4}\n"
+									, prodname.Replace("\"", "").Replace("'", "")		// Product
+									, description										// Description
 									, in_data[2].Replace("\"", "").Replace("'", " ")	// Filter
-									, in_data[3].Replace("\"", "").Replace("'", " ")  // Version
+									, in_data[3].Replace("\"", "").Replace("'", " ")  	// Version
 									, in_data[8].Replace("\"", "").Replace("'", " ")	// Guid
 									, in_data[4].Replace("\"", "").Replace("'", " ")	// Company
 								);
-								continue;
+								if (!DEBUG) {
+									continue;
+								}
 							}
 							if (conf.testrun && i > 10) {
 								break;
 							}
 							create_software_product(
 								  in_data[1].Replace("\"", "").Replace("'", " ")	// Product
-								, description					// Description
+								, description										// Description
 								, in_data[2].Replace("\"", "").Replace("'", " ")	// Filter
-								, in_data[3].Replace("\"", "").Replace("'", " ")  // Version
+								, in_data[3].Replace("\"", "").Replace("'", " ")  	// Version
 								, in_data[8].Replace("\"", "").Replace("'", " ")	// Guid
 								, in_data[4].Replace("\"", "").Replace("'", " ")	// Company
 							);
@@ -341,6 +343,10 @@ IMPORT commands:
 
 		public static void create_software_product(string product, string description, string filter, string version, string guid, string company) {
 			SoftwareProductManagementLib managementLib = new SoftwareProductManagementLib();
+			if (product == String.Empty || product == "" || product.Length == 0) {
+				Console.WriteLine("Skipping line with no product name...");
+				return;
+			}
 			SoftwareProductDetails productDetails = managementLib.CreateSoftwareProduct(product, description, company);
 
 			Console.WriteLine("Company guid = {0}.", productDetails.CompanyGuid.ToString());
@@ -378,7 +384,22 @@ IMPORT commands:
 			// We only add filters if _both_ the company and product are present in the config data
 			if (filter != "" && company != "") {
 				
-				string sql_filter = String.Format(sql.product_filter_query, filter, company, version);
+				string final_sql_filter = "";
+				// Break the filter string into where closes
+				if (filter.Contains("+")) {
+					foreach (String term in filter.Split("+".ToCharArray())) {
+						if (DEBUG) {
+							Console.WriteLine(term);
+						}
+						final_sql_filter += "AND Lower(component.Name) Like Lower(''%" + term + "%'') ";
+					}
+				} else {
+				}
+				if (DEBUG) {
+					Console.WriteLine("SQL component filter: {0}", final_sql_filter);
+				}
+				
+				string sql_filter = String.Format(sql.product_filter_query, final_sql_filter, company, version);
 				string sql_insert_filter = String.Format(sql.ins_product_filter, productDetails.Guid, filter, company, version, sql_filter);
 				if (DEBUG) {
 					Console.WriteLine("Running SQL statement:\n{0}", sql_insert_filter);
